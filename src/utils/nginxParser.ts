@@ -142,13 +142,58 @@ function tokenize(input: string): Token[] {
     if (/[^\s;{}'\"#]/.test(char)) {
       const startColumn = column;
       let value = '';
-      
-      while (pos < input.length && /[^\s;{}'\"#]/.test(input[pos])) {
-        value += input[pos];
+
+      while (pos < input.length) {
+        const currentChar = input[pos];
+
+        // 如果遇到空格、分号、引号或注释,停止
+        if (/[\s;'\"#]/.test(currentChar)) {
+          break;
+        }
+
+        // 特殊处理 nginx 变量 ${variable_name}
+        if (currentChar === '$' && pos + 1 < input.length && input[pos + 1] === '{') {
+          // 将 ${...} 作为一个整体添加到 value 中
+          value += currentChar; // 添加 $
+          pos++;
+          column++;
+
+          value += input[pos]; // 添加 {
+          pos++;
+          column++;
+
+          // 继续读取直到遇到 }
+          while (pos < input.length && input[pos] !== '}') {
+            if (input[pos] === '\n') {
+              line++;
+              column = 1;
+            } else {
+              column++;
+            }
+            value += input[pos];
+            pos++;
+          }
+
+          // 添加结束的 }
+          if (pos < input.length && input[pos] === '}') {
+            value += input[pos];
+            pos++;
+            column++;
+          }
+          continue;
+        }
+
+        // 如果遇到 { 或 } 但不是 ${} 变量的一部分,停止
+        if (currentChar === '{' || currentChar === '}') {
+          break;
+        }
+
+        // 普通字符,添加到 value
+        value += currentChar;
         pos++;
         column++;
       }
-      
+
       tokens.push({ type: 'WORD', value, line, column: startColumn });
       continue;
     }
